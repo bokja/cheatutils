@@ -70,6 +70,9 @@ neoForge {
             // You can set various levels here.
             // Please read: https://stackoverflow.com/questions/2031163/when-to-use-the-different-log-levels
             logLevel = org.slf4j.event.Level.DEBUG
+
+            // Ensure AWT is not headless so Swing-based overlay can start
+            systemProperty 'java.awt.headless', 'false'
         }
     }
 

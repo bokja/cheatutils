@@ -2,6 +2,7 @@ package com.zergatul.cheatutils.render;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.zergatul.cheatutils.common.events.RenderWorldLastEvent;
+import com.zergatul.cheatutils.modules.visuals.ExternalOverlay;
 import com.zergatul.cheatutils.render.gl.BlockOverlayBufferProgram;
 import com.zergatul.cheatutils.render.gl.FrameBuffer;
 import com.zergatul.cheatutils.render.gl.OverlayDrawProgram;
@@ -69,49 +70,51 @@ public class BlockOverlayRenderer {
     public void end(float red, float green, float blue, float alpha) {
         renderInFrameBuffer();
 
-        // set line settings
-        GlStateManager._enableBlend(); //glEnable(GL_BLEND);
-        GlStateManager._blendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO); //GL30.glBlendFuncSeparate(GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA, GL30.GL_ONE, GL30.GL_ZERO);
-        GlStateManager._disableDepthTest(); //GL30.glDisable(GL30.GL_DEPTH_TEST);
+        if (!ExternalOverlay.instance.isEnabled()) {
+            // in-game composite path
+            GlStateManager._enableBlend();
+            GlStateManager._blendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
+            GlStateManager._disableDepthTest();
 
-        // draw with shader program
-        drawProgram.buffer.add(-1);
-        drawProgram.buffer.add(-1);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(0);
+            // draw with shader program
+            drawProgram.buffer.add(-1);
+            drawProgram.buffer.add(-1);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(0);
 
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(-1);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(0);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(-1);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(0);
 
-        drawProgram.buffer.add(-1);
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(1);
+            drawProgram.buffer.add(-1);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(1);
 
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(1);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(1);
 
-        drawProgram.buffer.add(-1);
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(1);
+            drawProgram.buffer.add(-1);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(1);
 
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(-1);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(0);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(-1);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(0);
 
-        drawProgram.draw(FrameBuffers.get1(), red, green, blue, alpha);
+            drawProgram.draw(FrameBuffers.get1(), red, green, blue, alpha);
+        }
 
         // reset renderer state
         this.event = null;
@@ -134,8 +137,11 @@ public class BlockOverlayRenderer {
 
         // draw with shader program in framebuffer
         FrameBuffers.get1().bind();
-        GL30.glClearColor(0, 0, 0, 0);
-        GL30.glClear(GL30.GL_COLOR_BUFFER_BIT);
+        if (!ExternalOverlay.instance.isEnabled()) {
+            // Clear only in in-game composite path; external overlay gets cleared once per frame
+            GL30.glClearColor(0, 0, 0, 0);
+            GL30.glClear(GL30.GL_COLOR_BUFFER_BIT);
+        }
         bufferProgram.draw(event.getMvp());
 
         FrameBuffer.pop();

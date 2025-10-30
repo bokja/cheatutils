@@ -2,6 +2,8 @@ package com.zergatul.cheatutils.render;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.zergatul.cheatutils.common.events.RenderWorldLastEvent;
+import com.zergatul.cheatutils.modules.visuals.ExternalOverlay;
+import com.zergatul.cheatutils.render.gl.FrameBuffer;
 import com.zergatul.cheatutils.render.gl.EspGroupLinesProgram;
 import net.minecraft.world.phys.Vec3;
 
@@ -43,8 +45,14 @@ public class FastGroupLineRenderer implements GroupLineRenderer {
         GlStateManager._disableDepthTest(); //GL30.glDisable(GL30.GL_DEPTH_TEST);
         glEnable(GL_LINE_SMOOTH);
 
-        // draw with shader program
-        program.draw(event.getMvp(), r, g, b, a);
+        if (ExternalOverlay.instance.isEnabled()) {
+            FrameBuffer.push();
+            FrameBuffers.get1().bind();
+            program.draw(event.getMvp(), r, g, b, a);
+            FrameBuffer.pop();
+        } else {
+            program.draw(event.getMvp(), r, g, b, a);
+        }
 
         // reset renderer state
         this.event = null;

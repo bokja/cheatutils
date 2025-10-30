@@ -1,162 +1,162 @@
 package com.zergatul.cheatutils.overlay;
 
+import com.zergatul.cheatutils.common.Events;
+import com.zergatul.cheatutils.common.events.RenderGuiEvent;
 import com.zergatul.cheatutils.common.events.RenderWorldLastEvent;
 import com.zergatul.cheatutils.modules.visuals.ExternalOverlayBackend;
+import com.zergatul.cheatutils.render.gl.FrameBuffer;
+import com.zergatul.cheatutils.render.FrameBuffers;
+import com.zergatul.cheatutils.render.gl.OverlayDrawProgram;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.BlockPos;
-import org.joml.Matrix4f;
-import org.joml.Vector4f;
+import org.lwjgl.glfw.GLFW;
+import org.lwjgl.opengl.GL;
+import org.lwjgl.opengl.GL30;
 
-import javax.swing.*;
-import java.awt.Color;
-import java.awt.Rectangle;
-import java.awt.Shape;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class NeoForgeExternalOverlayBackend implements ExternalOverlayBackend {
 
-    private final Minecraft mc = Minecraft.getInstance();
+	private final Minecraft mc = Minecraft.getInstance();
 
-    private volatile Win32OverlayWindow window;
-    private volatile long mcGlfwWindow;
-    // no need to cache HWND; we align via GLFW APIs
+	// GLFW overlay window
+    private volatile long overlayWindow = 0;
+    private volatile long mcGlfwWindow = 0;
+	private final AtomicBoolean glInited = new AtomicBoolean(false);
+	private OverlayDrawProgram presenter;
 
-    @Override
-    public void onEnabled() {
-        if (!isWindows()) {
-            return;
-        }
-        ensureWindow();
-    }
+	public NeoForgeExternalOverlayBackend() {
+		// hook frame lifecycle to clear and present
+		Events.BeforeRenderWorld.add(this::onBeforeRenderWorld);
+		Events.PostRenderGui.add(this::onPostRenderGui);
+	}
 
-    @Override
-    public void onDisabled() {
-        if (window != null) {
-            SwingUtilities.invokeLater(() -> {
-                window.setVisible(false);
-                window.dispose();
-            });
-            window = null;
-        }
-    }
+	@Override
+	public void onEnabled() {
+		ensureWindow();
+	}
 
-    @Override
-    public void submitBlockOverlays(RenderWorldLastEvent event, List<BlockPos> blocks, int rgba) {
-        if (!isWindows() || blocks == null || blocks.isEmpty()) {
-            return;
-        }
-        ensureWindow();
-        if (window == null) {
-            return;
-        }
+	@Override
+	public void onDisabled() {
+		if (overlayWindow != 0) {
+			long toDestroy = overlayWindow;
+			overlayWindow = 0;
+			// destroy on render thread to be safe
+			GLFW.glfwMakeContextCurrent(0);
+			GLFW.glfwDestroyWindow(toDestroy);
+			glInited.set(false);
+		}
+	}
 
-        int width = mc.getWindow().getWidth();
-        int height = mc.getWindow().getHeight();
-        int halfW = width / 2;
-        int halfH = height / 2;
+	@Override
+	public void submitBlockOverlays(RenderWorldLastEvent event, java.util.List<net.minecraft.core.BlockPos> blocks, int rgba) {
+		// no-op; Block ESP already renders into FrameBuffers.get1() in external-overlay mode
+	}
 
-        Matrix4f pose = event.getPose();
-        Matrix4f proj = event.getProjection();
+	private void onBeforeRenderWorld() {
+		// clear overlay color once per frame
+		if (overlayWindow == 0) {
+			return;
+		}
+		FrameBuffer.push();
+		FrameBuffers.get1().bind();
+		GL30.glClearColor(0f, 0f, 0f, 0f);
+		GL30.glClear(GL30.GL_COLOR_BUFFER_BIT);
+		FrameBuffer.pop();
+	}
 
-        double camX = event.getCamera().getPosition().x;
-        double camY = event.getCamera().getPosition().y;
-        double camZ = event.getCamera().getPosition().z;
+	private void onPostRenderGui(RenderGuiEvent event) {
+		present();
+	}
 
-        List<Shape> shapes = new ArrayList<>();
-        for (BlockPos pos : blocks) {
-            float x1 = (float) (pos.getX() - camX);
-            float y1 = (float) (pos.getY() - camY);
-            float z1 = (float) (pos.getZ() - camZ);
-            float x2 = x1 + 1f;
-            float y2 = y1 + 1f;
-            float z2 = z1 + 1f;
+	private void ensureWindow() {
+		if (overlayWindow != 0) {
+			return;
+		}
+		if (!isWindows()) {
+			return;
+		}
+		// must run on render thread with a current context
+        long current = GLFW.glfwGetCurrentContext();
+        if (current == 0) {
+			return;
+		}
+        mcGlfwWindow = mc.getWindow().handle();
 
-            // 8 corners
-            float[][] corners = new float[][]{
-                    {x1, y1, z1}, {x2, y1, z1}, {x1, y2, z1}, {x2, y2, z1},
-                    {x1, y1, z2}, {x2, y1, z2}, {x1, y2, z2}, {x2, y2, z2}
-            };
+		GLFW.glfwWindowHint(GLFW.GLFW_DECORATED, GLFW.GLFW_FALSE);
+		GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_FALSE);
+		GLFW.glfwWindowHint(GLFW.GLFW_TRANSPARENT_FRAMEBUFFER, GLFW.GLFW_TRUE);
+		GLFW.glfwWindowHint(GLFW.GLFW_FOCUS_ON_SHOW, GLFW.GLFW_FALSE);
 
-            boolean anyInFront = false;
-            int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE;
-            int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE;
+		int width = mc.getWindow().getWidth();
+		int height = mc.getWindow().getHeight();
+        overlayWindow = GLFW.glfwCreateWindow(width, height, "", 0, mcGlfwWindow);
+		if (overlayWindow == 0) {
+			return;
+		}
 
-            for (float[] c : corners) {
-                Vector4f v = new Vector4f(c[0], c[1], c[2], 1f);
-                Vector4f v1 = pose.transform(new Vector4f(v));
-                Vector4f v2 = proj.transform(v1);
-                if (v2.z > 0f) {
-                    anyInFront = true;
-                    int sx = Math.round(v2.x / v2.w * halfW + halfW);
-                    int sy = Math.round(-v2.y / v2.w * halfH + halfH);
-                    if (sx < minX) minX = sx;
-                    if (sy < minY) minY = sy;
-                    if (sx > maxX) maxX = sx;
-                    if (sy > maxY) maxY = sy;
-                }
-            }
+		GLFW.glfwSetWindowAttrib(overlayWindow, GLFW.GLFW_FLOATING, GLFW.GLFW_TRUE);
+		// mouse passthrough (GLFW 3.3+)
+		final int GLFW_MOUSE_PASSTHROUGH = 0x0002000D;
+		GLFW.glfwSetWindowAttrib(overlayWindow, GLFW_MOUSE_PASSTHROUGH, GLFW.GLFW_TRUE);
 
-            if (anyInFront && minX < maxX && minY < maxY) {
-                shapes.add(new Rectangle(minX, minY, maxX - minX, maxY - minY));
-            }
-        }
+		// initialize GL for overlay context
+        GLFW.glfwMakeContextCurrent(overlayWindow);
+		if (glInited.compareAndSet(false, true)) {
+			GL.createCapabilities();
+			presenter = new OverlayDrawProgram();
+		}
+		GLFW.glfwSwapInterval(0);
+        GLFW.glfwMakeContextCurrent(current);
+	}
 
-        alignOverlayToMinecraft();
-        Color color = new Color(rgba, true);
-        SwingUtilities.invokeLater(() -> {
-            if (window != null) {
-                window.setVisible(true);
-                window.setFrame(shapes, color);
-            }
-        });
-    }
+	private void present() {
+		if (overlayWindow == 0) {
+			return;
+		}
 
-    private void ensureWindow() {
-        if (window != null) {
-            return;
-        }
-        if (!isWindows()) {
-            return;
-        }
-        long ctx = org.lwjgl.glfw.GLFW.glfwGetCurrentContext();
-        mcGlfwWindow = ctx != 0 ? ctx : mcGlfwWindow;
-        SwingUtilities.invokeLater(() -> {
-            if (window == null) {
-                window = new Win32OverlayWindow();
-                window.pack();
-                window.enableClickThrough();
-            }
-        });
-    }
+		// mirror size/position to MC client area
+        long mcWindow = mcGlfwWindow != 0 ? mcGlfwWindow : mc.getWindow().handle();
+		int[] wx = new int[1];
+		int[] wy = new int[1];
+		GLFW.glfwGetWindowPos(mcWindow, wx, wy);
+		int[] left = new int[1];
+		int[] top = new int[1];
+		int[] right = new int[1];
+		int[] bottom = new int[1];
+		GLFW.glfwGetWindowFrameSize(mcWindow, left, top, right, bottom);
+		int clientX = wx[0] + left[0];
+		int clientY = wy[0] + top[0];
+		int width = mc.getWindow().getWidth();
+		int height = mc.getWindow().getHeight();
+		GLFW.glfwSetWindowPos(overlayWindow, clientX, clientY);
+		GLFW.glfwSetWindowSize(overlayWindow, width, height);
+		GLFW.glfwShowWindow(overlayWindow);
 
-    private void alignOverlayToMinecraft() {
-        if (window == null || mcGlfwWindow == 0) {
-            return;
-        }
-        int[] wx = new int[1];
-        int[] wy = new int[1];
-        org.lwjgl.glfw.GLFW.glfwGetWindowPos(mcGlfwWindow, wx, wy);
-        int[] left = new int[1];
-        int[] top = new int[1];
-        int[] right = new int[1];
-        int[] bottom = new int[1];
-        org.lwjgl.glfw.GLFW.glfwGetWindowFrameSize(mcGlfwWindow, left, top, right, bottom);
-        int clientX = wx[0] + left[0];
-        int clientY = wy[0] + top[0];
-        int width = mc.getWindow().getWidth();
-        int height = mc.getWindow().getHeight();
-        SwingUtilities.invokeLater(() -> {
-            if (window != null) {
-                window.setBounds(clientX, clientY, width, height);
-            }
-        });
-    }
+		// draw texture into overlay window backbuffer
+        GLFW.glfwMakeContextCurrent(overlayWindow);
+		GL30.glViewport(0, 0, width, height);
+		GL30.glClearColor(0f, 0f, 0f, 0f);
+		GL30.glClear(GL30.GL_COLOR_BUFFER_BIT);
 
-    private static boolean isWindows() {
-        String os = System.getProperty("os.name", "");
-        return os.toLowerCase().contains("win");
-    }
+        // build fullscreen quad (NDC) once per present (x, y, z, u, v)
+        presenter.buffer.clear();
+        presenter.buffer.add(-1); presenter.buffer.add(-1); presenter.buffer.add(0); presenter.buffer.add(0); presenter.buffer.add(0);
+        presenter.buffer.add( 1); presenter.buffer.add(-1); presenter.buffer.add(0); presenter.buffer.add(1); presenter.buffer.add(0);
+        presenter.buffer.add(-1); presenter.buffer.add( 1); presenter.buffer.add(0); presenter.buffer.add(0); presenter.buffer.add(1);
+        presenter.buffer.add( 1); presenter.buffer.add( 1); presenter.buffer.add(0); presenter.buffer.add(1); presenter.buffer.add(1);
+        presenter.buffer.add(-1); presenter.buffer.add( 1); presenter.buffer.add(0); presenter.buffer.add(0); presenter.buffer.add(1);
+        presenter.buffer.add( 1); presenter.buffer.add(-1); presenter.buffer.add(0); presenter.buffer.add(1); presenter.buffer.add(0);
+
+		presenter.draw(FrameBuffers.get1(), 1f, 1f, 1f, 1f);
+		presenter.unbind();
+        GLFW.glfwSwapBuffers(overlayWindow);
+        GLFW.glfwMakeContextCurrent(mcWindow);
+	}
+
+	private static boolean isWindows() {
+		String os = System.getProperty("os.name", "");
+		return os.toLowerCase().contains("win");
+	}
 }
 
 

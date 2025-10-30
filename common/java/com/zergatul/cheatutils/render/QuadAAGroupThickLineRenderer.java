@@ -3,6 +3,8 @@ package com.zergatul.cheatutils.render;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.platform.Window;
 import com.zergatul.cheatutils.common.events.RenderWorldLastEvent;
+import com.zergatul.cheatutils.modules.visuals.ExternalOverlay;
+import com.zergatul.cheatutils.render.gl.FrameBuffer;
 import com.zergatul.cheatutils.render.gl.EspGroupTrianglesAAProgram;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.phys.Vec3;
@@ -88,8 +90,14 @@ public class QuadAAGroupThickLineRenderer implements GroupThickLineRenderer {
         GlStateManager._disableDepthTest(); //GL30.glDisable(GL30.GL_DEPTH_TEST);
         GlStateManager._disableCull(); //GL30.glDisable(GL30.GL_CULL_FACE);
 
-        // draw with shader program
-        program.draw(r, g, b, a, lineWidth, FEATHER);
+        if (ExternalOverlay.instance.isEnabled()) {
+            FrameBuffer.push();
+            FrameBuffers.get1().bind();
+            program.draw(r, g, b, a, lineWidth, FEATHER);
+            FrameBuffer.pop();
+        } else {
+            program.draw(r, g, b, a, lineWidth, FEATHER);
+        }
 
         // reset renderer state
         this.event = null;
