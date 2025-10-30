@@ -5,6 +5,7 @@ import com.zergatul.cheatutils.common.Events;
 import com.zergatul.cheatutils.configs.BlockEspConfig;
 import com.zergatul.cheatutils.configs.ConfigStore;
 import com.zergatul.cheatutils.modules.utilities.RenderUtilities;
+import com.zergatul.cheatutils.modules.visuals.ExternalOverlay;
 import com.zergatul.cheatutils.render.*;
 import com.zergatul.cheatutils.common.events.RenderWorldLastEvent;
 import com.zergatul.cheatutils.scripting.modules.BlockEspEvent;
@@ -206,15 +207,19 @@ public class BlockEsp {
             }
 
             if (!overlayList.isEmpty()) {
-                overlayRenderer.begin(event);
-                for (BlockPos pos: overlayList) {
-                    renderOverlay(overlayRenderer, pos);
+                if (ExternalOverlay.instance.isEnabled()) {
+                    ExternalOverlay.instance.submitBlockOverlays(event, overlayList, config.overlayColor.getRGB());
+                } else {
+                    overlayRenderer.begin(event);
+                    for (BlockPos pos: overlayList) {
+                        renderOverlay(overlayRenderer, pos);
+                    }
+                    overlayRenderer.end(
+                            config.overlayColor.getRed() / 255f,
+                            config.overlayColor.getGreen() / 255f,
+                            config.overlayColor.getBlue() / 255f,
+                            config.overlayColor.getAlpha() / 255f);
                 }
-                overlayRenderer.end(
-                        config.overlayColor.getRed() / 255f,
-                        config.overlayColor.getGreen() / 255f,
-                        config.overlayColor.getBlue() / 255f,
-                        config.overlayColor.getAlpha() / 255f);
             }
         }
     }

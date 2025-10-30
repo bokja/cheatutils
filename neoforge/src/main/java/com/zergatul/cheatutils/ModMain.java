@@ -4,6 +4,8 @@ import com.zergatul.cheatutils.common.Events;
 import com.zergatul.cheatutils.font.SystemFonts;
 import com.zergatul.cheatutils.modules.Modules;
 import com.zergatul.cheatutils.modules.utilities.*;
+import com.zergatul.cheatutils.modules.visuals.ExternalOverlay;
+import com.zergatul.cheatutils.overlay.NeoForgeExternalOverlayBackend;
 import com.zergatul.cheatutils.utils.DebugScreenExtensions;
 import com.zergatul.cheatutils.webui.ConfigHttpServer;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -39,6 +41,9 @@ public class ModMain {
         SystemFonts.initAsync();
         Profiles.instance.init();
         ConfigHttpServer.instance.start();
+        if (System.getProperty("os.name", "").toLowerCase().contains("win")) {
+            ExternalOverlay.instance.setBackend(new NeoForgeExternalOverlayBackend());
+        }
     }
 
     private void onRegisterKeybindings(final RegisterKeyMappingsEvent event) {

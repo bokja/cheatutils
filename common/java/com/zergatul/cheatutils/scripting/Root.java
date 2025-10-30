@@ -6,6 +6,7 @@ import com.zergatul.cheatutils.scripting.modules.*;
 public class Root {
 
     public static EspApi esp = new EspApi();
+    public static ExternalOverlayApi externalOverlay = new ExternalOverlayApi();
 
     // automation
     public static AutoDropApi autoDrop = new AutoDropApi();

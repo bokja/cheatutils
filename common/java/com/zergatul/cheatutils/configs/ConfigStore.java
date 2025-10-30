@@ -170,6 +170,15 @@ public class ConfigStore {
             } catch (Throwable e) {
                 logger.error("Toggle FreeCam script initialization failed", e);
             }
+
+            final String toggleExternalOverlayName = "Toggle External Overlay";
+            try {
+                ScriptsController.instance.add(toggleExternalOverlayName, "externalOverlay.toggle();", false);
+                KeyBindingsController.instance.keys[2].setKey(InputConstants.getKey("key.keyboard.f7"));
+                KeyBindingsController.instance.assign(2, toggleExternalOverlayName);
+            } catch (Throwable e) {
+                logger.error("Toggle External Overlay script initialization failed", e);
+            }
         } else {
             ArrayList<KeyBindingScriptsConfig.ScriptEntry> copy = new ArrayList<>(config.keyBindingScriptsConfig.scripts);
             config.keyBindingScriptsConfig.scripts.clear();
