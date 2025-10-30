@@ -23,6 +23,7 @@ public class NeoForgeExternalOverlayBackend implements ExternalOverlayBackend {
     private volatile long mcGlfwWindow = 0;
 	private final AtomicBoolean glInited = new AtomicBoolean(false);
 	private OverlayDrawProgram presenter;
+	private volatile boolean enabledFlag = false;
 
 	public NeoForgeExternalOverlayBackend() {
 		// hook frame lifecycle to clear and present
@@ -32,18 +33,15 @@ public class NeoForgeExternalOverlayBackend implements ExternalOverlayBackend {
 
 	@Override
 	public void onEnabled() {
+		enabledFlag = true;
 		ensureWindow();
 	}
 
 	@Override
 	public void onDisabled() {
+		enabledFlag = false;
 		if (overlayWindow != 0) {
-			long toDestroy = overlayWindow;
-			overlayWindow = 0;
-			// destroy on render thread to be safe
-			GLFW.glfwMakeContextCurrent(0);
-			GLFW.glfwDestroyWindow(toDestroy);
-			glInited.set(false);
+			GLFW.glfwHideWindow(overlayWindow);
 		}
 	}
 
@@ -54,7 +52,7 @@ public class NeoForgeExternalOverlayBackend implements ExternalOverlayBackend {
 
 	private void onBeforeRenderWorld() {
 		// clear overlay color once per frame
-		if (overlayWindow == 0) {
+		if (!enabledFlag || overlayWindow == 0) {
 			return;
 		}
 		FrameBuffer.push();
@@ -106,11 +104,11 @@ public class NeoForgeExternalOverlayBackend implements ExternalOverlayBackend {
 			presenter = new OverlayDrawProgram();
 		}
 		GLFW.glfwSwapInterval(0);
-        GLFW.glfwMakeContextCurrent(current);
+		GLFW.glfwMakeContextCurrent(current);
 	}
 
 	private void present() {
-		if (overlayWindow == 0) {
+		if (!enabledFlag || overlayWindow == 0) {
 			return;
 		}
 
@@ -126,15 +124,23 @@ public class NeoForgeExternalOverlayBackend implements ExternalOverlayBackend {
 		GLFW.glfwGetWindowFrameSize(mcWindow, left, top, right, bottom);
 		int clientX = wx[0] + left[0];
 		int clientY = wy[0] + top[0];
-		int width = mc.getWindow().getWidth();
-		int height = mc.getWindow().getHeight();
+		int widthPx = mc.getWindow().getWidth();
+		int heightPx = mc.getWindow().getHeight();
+		float[] scaleX = new float[1];
+		float[] scaleY = new float[1];
+		GLFW.glfwGetWindowContentScale(mcWindow, scaleX, scaleY);
+		int widthWU = Math.max(1, Math.round(widthPx / Math.max(0.0001f, scaleX[0])));
+		int heightWU = Math.max(1, Math.round(heightPx / Math.max(0.0001f, scaleY[0])));
 		GLFW.glfwSetWindowPos(overlayWindow, clientX, clientY);
-		GLFW.glfwSetWindowSize(overlayWindow, width, height);
+		GLFW.glfwSetWindowSize(overlayWindow, widthWU, heightWU);
 		GLFW.glfwShowWindow(overlayWindow);
 
 		// draw texture into overlay window backbuffer
         GLFW.glfwMakeContextCurrent(overlayWindow);
-		GL30.glViewport(0, 0, width, height);
+		int[] fbw = new int[1];
+		int[] fbh = new int[1];
+		GLFW.glfwGetFramebufferSize(overlayWindow, fbw, fbh);
+		GL30.glViewport(0, 0, fbw[0], fbh[0]);
 		GL30.glClearColor(0f, 0f, 0f, 0f);
 		GL30.glClear(GL30.GL_COLOR_BUFFER_BIT);
 

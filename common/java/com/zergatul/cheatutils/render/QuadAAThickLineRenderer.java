@@ -3,6 +3,8 @@ package com.zergatul.cheatutils.render;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.platform.Window;
 import com.zergatul.cheatutils.common.events.RenderWorldLastEvent;
+import com.zergatul.cheatutils.modules.visuals.ExternalOverlay;
+import com.zergatul.cheatutils.render.gl.FrameBuffer;
 import com.zergatul.cheatutils.render.gl.EspTrianglesAAProgram;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.phys.Vec3;
@@ -102,7 +104,14 @@ public class QuadAAThickLineRenderer implements ThickLineRenderer {
             GlStateManager._disableCull();
 
             // draw with shader program
-            program.draw(FEATHER);
+            if (ExternalOverlay.instance.isEnabled()) {
+                FrameBuffer.push();
+                FrameBuffers.get1().bind();
+                program.draw(FEATHER);
+                FrameBuffer.pop();
+            } else {
+                program.draw(FEATHER);
+            }
         }
 
         // reset renderer state

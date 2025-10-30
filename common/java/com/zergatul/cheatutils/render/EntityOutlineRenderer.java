@@ -4,6 +4,7 @@ import com.mojang.blaze3d.opengl.GlStateManager;
 import com.zergatul.cheatutils.render.gl.EntityOverlayBufferProgram;
 import com.zergatul.cheatutils.render.gl.FrameBuffer;
 import com.zergatul.cheatutils.render.gl.OutlineDrawProgram;
+import com.zergatul.cheatutils.modules.visuals.ExternalOverlay;
 import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL30;
 
@@ -23,10 +24,12 @@ public class EntityOutlineRenderer {
 
         FrameBuffer.push();
 
-        // clear framebuffer
+        // bind overlay framebuffer; clear only when not using external overlay
         FrameBuffers.get1().bind();
-        GL30.glClearColor(0, 0, 0, 0);
-        GL30.glClear(GL30.GL_COLOR_BUFFER_BIT);
+        if (!ExternalOverlay.instance.isEnabled()) {
+            GL30.glClearColor(0, 0, 0, 0);
+            GL30.glClear(GL30.GL_COLOR_BUFFER_BIT);
+        }
 
         // setup render parameters once
         GlStateManager._enableBlend(); //glEnable(GL_BLEND);
@@ -83,50 +86,52 @@ public class EntityOutlineRenderer {
     public void end(float red, float green, float blue, float alpha) {
         FrameBuffer.pop();
 
-        // set draw settings
-        GlStateManager._enableBlend(); //glEnable(GL_BLEND);
-        GlStateManager._blendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); //GL30.glBlendFunc(GL30.GL_SRC_ALPHA, GL30.GL_ONE_MINUS_SRC_ALPHA);
-        GlStateManager._disableDepthTest(); //GL30.glDisable(GL30.GL_DEPTH_TEST);
-        GlStateManager._enableCull(); // GL30.glEnable(GL30.GL_CULL_FACE);
+        if (!ExternalOverlay.instance.isEnabled()) {
+            // in-game composite path only
+            GlStateManager._enableBlend();
+            GlStateManager._blendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            GlStateManager._disableDepthTest();
+            GlStateManager._enableCull();
 
-        // draw with shader program
-        drawProgram.buffer.add(-1);
-        drawProgram.buffer.add(-1);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(0);
+            // draw with shader program
+            drawProgram.buffer.add(-1);
+            drawProgram.buffer.add(-1);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(0);
 
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(-1);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(0);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(-1);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(0);
 
-        drawProgram.buffer.add(-1);
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(1);
+            drawProgram.buffer.add(-1);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(1);
 
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(1);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(1);
 
-        drawProgram.buffer.add(-1);
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(1);
+            drawProgram.buffer.add(-1);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(1);
 
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(-1);
-        drawProgram.buffer.add(0);
-        drawProgram.buffer.add(1);
-        drawProgram.buffer.add(0);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(-1);
+            drawProgram.buffer.add(0);
+            drawProgram.buffer.add(1);
+            drawProgram.buffer.add(0);
 
-        drawProgram.draw(FrameBuffers.get1(), red, green, blue, alpha);
+            drawProgram.draw(FrameBuffers.get1(), red, green, blue, alpha);
+        }
     }
 
     public void close() {

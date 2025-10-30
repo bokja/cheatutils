@@ -2,6 +2,8 @@ package com.zergatul.cheatutils.render;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.zergatul.cheatutils.common.events.RenderWorldLastEvent;
+import com.zergatul.cheatutils.modules.visuals.ExternalOverlay;
+import com.zergatul.cheatutils.render.gl.FrameBuffer;
 import com.zergatul.cheatutils.render.gl.EspLinesProgram;
 import net.minecraft.world.phys.Vec3;
 
@@ -56,7 +58,14 @@ public class FastLineRenderer implements LineRenderer {
             }
 
             // draw with shader program
-            program.draw(event.getMvp());
+            if (ExternalOverlay.instance.isEnabled()) {
+                FrameBuffer.push();
+                FrameBuffers.get1().bind();
+                program.draw(event.getMvp());
+                FrameBuffer.pop();
+            } else {
+                program.draw(event.getMvp());
+            }
         }
 
         // reset renderer state
