@@ -114,25 +114,26 @@ public class NeoForgeExternalOverlayBackend implements ExternalOverlayBackend {
 
 		// mirror size/position to MC client area
         long mcWindow = mcGlfwWindow != 0 ? mcGlfwWindow : mc.getWindow().handle();
-		int[] wx = new int[1];
-		int[] wy = new int[1];
-		GLFW.glfwGetWindowPos(mcWindow, wx, wy);
-		int[] left = new int[1];
-		int[] top = new int[1];
-		int[] right = new int[1];
-		int[] bottom = new int[1];
-		GLFW.glfwGetWindowFrameSize(mcWindow, left, top, right, bottom);
-		int clientX = wx[0] + left[0];
-		int clientY = wy[0] + top[0];
-		int widthPx = mc.getWindow().getWidth();
-		int heightPx = mc.getWindow().getHeight();
-		float[] scaleX = new float[1];
-		float[] scaleY = new float[1];
-		GLFW.glfwGetWindowContentScale(mcWindow, scaleX, scaleY);
-		int widthWU = Math.max(1, Math.round(widthPx / Math.max(0.0001f, scaleX[0])));
-		int heightWU = Math.max(1, Math.round(heightPx / Math.max(0.0001f, scaleY[0])));
-		GLFW.glfwSetWindowPos(overlayWindow, clientX, clientY);
-		GLFW.glfwSetWindowSize(overlayWindow, widthWU, heightWU);
+        int[] wx = new int[1];
+        int[] wy = new int[1];
+        GLFW.glfwGetWindowPos(mcWindow, wx, wy);
+        int[] left = new int[1];
+        int[] top = new int[1];
+        int[] right = new int[1];
+        int[] bottom = new int[1];
+        GLFW.glfwGetWindowFrameSize(mcWindow, left, top, right, bottom);
+        int clientX = wx[0] + left[0];
+        int clientY = wy[0] + top[0];
+        int widthPx = mc.getWindow().getWidth();
+        int heightPx = mc.getWindow().getHeight();
+
+        float[] scaleX = new float[1];
+        float[] scaleY = new float[1];
+        GLFW.glfwGetWindowContentScale(mcWindow, scaleX, scaleY);
+        int widthWU = Math.max(1, Math.round(widthPx / Math.max(0.0001f, scaleX[0])));
+        int heightWU = Math.max(1, Math.round(heightPx / Math.max(0.0001f, scaleY[0])));
+        GLFW.glfwSetWindowPos(overlayWindow, clientX, clientY);
+        GLFW.glfwSetWindowSize(overlayWindow, widthWU, heightWU);
 		GLFW.glfwShowWindow(overlayWindow);
 
 		// draw texture into overlay window backbuffer
@@ -141,6 +142,17 @@ public class NeoForgeExternalOverlayBackend implements ExternalOverlayBackend {
 		int[] fbh = new int[1];
 		GLFW.glfwGetFramebufferSize(overlayWindow, fbw, fbh);
 		GL30.glViewport(0, 0, fbw[0], fbh[0]);
+
+        // one-shot correction if framebuffer size doesn't match MC size (DPI rounding)
+        if ((fbw[0] != widthPx || fbh[0] != heightPx) && widthWU > 0 && heightWU > 0) {
+            int correctedW = Math.max(1, Math.round((float) widthWU * widthPx / Math.max(1, fbw[0])));
+            int correctedH = Math.max(1, Math.round((float) heightWU * heightPx / Math.max(1, fbh[0])));
+            if (correctedW != widthWU || correctedH != heightWU) {
+                GLFW.glfwSetWindowSize(overlayWindow, correctedW, correctedH);
+                GLFW.glfwGetFramebufferSize(overlayWindow, fbw, fbh);
+                GL30.glViewport(0, 0, fbw[0], fbh[0]);
+            }
+        }
 		GL30.glClearColor(0f, 0f, 0f, 0f);
 		GL30.glClear(GL30.GL_COLOR_BUFFER_BIT);
 
